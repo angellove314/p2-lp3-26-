@@ -6,7 +6,7 @@ delivery_system.c
 README.md
 .gitignore
 ------------------------------------------------------------------------------------------------------------------------
-## Compilación
+Compilación
 
 Para compilar el programa, ejecutar:
 
