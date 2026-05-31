@@ -8,7 +8,6 @@
 #define CANT_REPARTIDORES 2
 #define TAM_COLAS 5
 #define PEDIDOS_POR_PRODUCTOR 4
-#define PERIODO_GENERACION 1
 
 #define FIN -1
 
@@ -30,8 +29,6 @@ Cola listos;
 pthread_mutex_t mutex_pendientes = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_listos = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_id = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mutex_periodo = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond_periodo = PTHREAD_COND_INITIALIZER;
 
 sem_t hay_pendientes;
 sem_t espacio_pendientes;
@@ -39,7 +36,6 @@ sem_t hay_listos;
 sem_t espacio_listos;
 
 int siguiente_id = 1;
-int periodo_actual = 0;
 
 const char *tipos[] = {
     "Pizza",
@@ -116,19 +112,12 @@ Pedido sacar_listo(void) {
 
 void *productor(void *dato) {
     int productor_id = *(int *)dato;
-    int periodo;
+    int i;
 
-    for (periodo = 1; periodo <= PEDIDOS_POR_PRODUCTOR; periodo++) {
-        Pedido pedido;
+    for (i = 0; i < PEDIDOS_POR_PRODUCTOR; i++) {
+        Pedido pedido = nuevo_pedido();
 
-        pthread_mutex_lock(&mutex_periodo);
-        while (periodo_actual < periodo) {
-            pthread_cond_wait(&cond_periodo, &mutex_periodo);
-        }
-        pthread_mutex_unlock(&mutex_periodo);
-
-        pedido = nuevo_pedido();
-
+        sleep(1);
         printf("Pedido generado: productor %d, pedido %d, comida %s\n",
                productor_id, pedido.id, pedido.tipo);
         poner_pendiente(pedido);
@@ -176,29 +165,10 @@ void *repartidor(void *dato) {
     return NULL;
 }
 
-void *reloj_generacion(void *dato) {
-    int i;
-
-    (void)dato;
-
-    for (i = 0; i < PEDIDOS_POR_PRODUCTOR; i++) {
-        sleep(PERIODO_GENERACION);
-
-        pthread_mutex_lock(&mutex_periodo);
-        periodo_actual++;
-        printf("Periodo de generacion %d\n", periodo_actual);
-        pthread_cond_broadcast(&cond_periodo);
-        pthread_mutex_unlock(&mutex_periodo);
-    }
-
-    return NULL;
-}
-
 int main(void) {
     pthread_t productores[CANT_PRODUCTORES];
     pthread_t cocineros[CANT_COCINEROS];
     pthread_t repartidores[CANT_REPARTIDORES];
-    pthread_t reloj;
     int id_productores[CANT_PRODUCTORES];
     int id_cocineros[CANT_COCINEROS];
     int id_repartidores[CANT_REPARTIDORES];
@@ -224,9 +194,6 @@ int main(void) {
         id_productores[i] = i + 1;
         pthread_create(&productores[i], NULL, productor, &id_productores[i]);
     }
-
-    pthread_create(&reloj, NULL, reloj_generacion, NULL);
-    pthread_join(reloj, NULL);
 
     for (i = 0; i < CANT_PRODUCTORES; i++) {
         pthread_join(productores[i], NULL);
@@ -256,8 +223,6 @@ int main(void) {
     sem_destroy(&espacio_pendientes);
     sem_destroy(&hay_listos);
     sem_destroy(&espacio_listos);
-    pthread_cond_destroy(&cond_periodo);
-    pthread_mutex_destroy(&mutex_periodo);
 
     return 0;
 }
